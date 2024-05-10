@@ -7,7 +7,8 @@ $TcpListener = [System.Net.Sockets.TcpListener]::new($SERVER_HOST, $SERVER_PORT)
 
 # Start listening for incoming connections
 $TcpListener.Start()
-Write-Host "[*] Listening on $SERVER_HOST:$SERVER_PORT"
+Write-Host ("[*] Server is now listening for incoming connections on {0}:{1}" -f $SERVER_HOST, $SERVER_PORT)
+
 
 # Accept incoming client connection
 $TcpClient = $TcpListener.AcceptTcpClient()
