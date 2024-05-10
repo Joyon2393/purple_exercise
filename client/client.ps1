@@ -1,6 +1,6 @@
 # Define the server's IP address and port
 $SERVER_HOST = "192.168.56.109"  # Replace with the server's IP address
-$SERVER_PORT = 2393
+$SERVER_PORT = 2392
 
 # Create a TCP client object
 $tcpClient = New-Object System.Net.Sockets.TcpClient
