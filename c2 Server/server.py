@@ -1,7 +1,7 @@
 import socket
 
 #server's IP address and port
-SERVER_HOST = '127.0.0.1'  # Listen on all network interfaces
+SERVER_HOST = '0.0.0.0'  # Listen on all network interfaces
 SERVER_PORT = 12345
 
 # socket object
