@@ -24,18 +24,8 @@ def receive_data():
     print("[Client Output]:", data)
 
 # Send commands to the client
-while True:
-    # Get command from user input
-    command = input("Enter command to execute on the client (or 'exit' to quit): ")
-    if command.lower() == 'exit':
-        client_socket.send(b'exit')  # Signal client to exit
-        break
-    
-    # Send the command to the client
-    client_socket.send(command.encode())
 
-    # Receive the output from the client
-    receive_data()
+receive_data()
 
 # Close the connection
 client_socket.close()
