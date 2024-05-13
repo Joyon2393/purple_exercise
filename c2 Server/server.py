@@ -2,7 +2,7 @@ import socket
 
 # Define the server's IP address and port
 SERVER_HOST = '0.0.0.0'  # Listen on all network interfaces
-SERVER_PORT = 9993
+SERVER_PORT = 9998
 
 # Create a socket object
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,8 +24,18 @@ def receive_data():
     print("[Client Output]:", data)
 
 # Send commands to the client
+while True:
+    # Get command from user input
+    command = input("Enter command to execute on the client (or 'exit' to quit): ")
+    if command.lower() == 'exit':
+        client_socket.send(b'exit')  # Signal client to exit
+        break
+    
+    # Send the command to the client
+    client_socket.send(command.encode())
 
-receive_data()
+    # Receive the output from the client
+    receive_data()
 
 # Close the connection
 client_socket.close()
